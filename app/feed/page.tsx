@@ -1,92 +1,86 @@
 "use client";
-import { useState } from "react";
+
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import FeedbackButtons from "../components/FeedbackButtons";
 
 export default function FeedPage() {
-  const [loading, setLoading] = useState(false);
+  const [cards, setCards] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const cards = [
-    {
-      id: "1",
-      title: "🎯 첫 번째 코칭 카드",
-      content: "윤준님, 오늘의 목표는 '브랜드 프로필 완성'입니다. 하단 버튼을 AI와 함께 시작하세요.",
-    },
-    {
-      id: "2",
-      title: "📈 성장 인사이트",
-      content:
-        "최근 활동 데이터에 따르면, 윤준님의 시장 활동 점수는 평균보다 15% 상승했습니다. 계속해서 MGI가 +3.5점을 유지 중입니다.",
-    },
-    {
-      id: "3",
-      title: "💬 피드백 요청",
-      content: "AI가 새로운 '스타일 분석' 기능을 테스트 중이에요. 직접 피드백을 남겨주세요.",
-    },
-  ];
+  // 🔹 카드 불러오기 함수
+  const fetchCards = async () => {
+    // ✅ 로그인 생략하고 userId 강제 지정 (테스트용)
+    const userId = "d4642595-4183-4491-a5b1-2ecb21237c9a"; // 🔸 Supabase users 테이블에서 실제 ID 복사
 
-  async function sendFeedback(cardId: string, feedbackType: string) {
-    setLoading(true);
-    const { error } = await supabase.from("feedbacks").insert([
-      {
-        card_id: cardId,
-        feedback_type: feedbackType,
-      },
-    ]);
-    setLoading(false);
+    const { data, error } = await supabase
+      .from("coaching_cards")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("피드백 저장 오류:", error.message);
-      alert("⚠️ 피드백 저장 중 오류가 발생했습니다.");
+      console.error("카드 로드 오류:", error.message);
     } else {
-      alert("✅ 피드백이 저장되었습니다. 감사합니다!");
+      setCards(data || []);
     }
+
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchCards();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen text-gray-600">
+        <div className="text-lg font-semibold">🔄 코칭 카드를 불러오는 중...</div>
+      </div>
+    );
   }
 
+  if (cards.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen text-gray-600">
+        <div className="text-2xl font-semibold mb-2">💡 아직 카드가 없습니다.</div>
+        <div className="text-gray-500">Madyu AI가 첫 번째 코칭 카드를 준비 중이에요.</div>
+      </div>
+    );
+  }
+
+  // ✅ 최근 카드 4개까지만 표시
+  const limitedCards = cards.slice(0, 4);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F1F5F9] to-[#E0E7FF] p-8">
-      <h1 className="text-3xl font-bold text-[#3B5BDB] mb-6">
-        Madyu AI 코디네이션
+    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 p-8">
+      <h1 className="text-3xl font-extrabold text-[#0066FF] mb-8 text-center">
+        Madyu AI 코칭 피드
       </h1>
 
-      <div className="space-y-6">
-        {cards.map((card) => (
+      <div className="max-w-3xl mx-auto space-y-6">
+        {limitedCards.map((card) => (
           <div
             key={card.id}
-            className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-5 shadow-sm hover:shadow-md transition"
+            className="p-6 rounded-2xl shadow-md border border-gray-100 bg-white hover:shadow-lg transition"
           >
-            <h2 className="text-xl font-semibold text-[#1E293B] mb-2">
-              {card.title}
-            </h2>
-            <p className="text-[#475569] mb-4 leading-relaxed">
-              {card.content}
-            </p>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">{card.title}</h2>
+            <p className="text-gray-600 mb-4 whitespace-pre-line">{card.content}</p>
 
-            <div className="flex gap-3">
-              <button
-                disabled={loading}
-                onClick={() => sendFeedback(card.id, "positive")}
-                className="px-3 py-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200"
-              >
-                👍 좋아요
-              </button>
-              <button
-                disabled={loading}
-                onClick={() => sendFeedback(card.id, "neutral")}
-                className="px-3 py-2 rounded-lg bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
-              >
-                🤔 개선 필요
-              </button>
-              <button
-                disabled={loading}
-                onClick={() => sendFeedback(card.id, "negative")}
-                className="px-3 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200"
-              >
-                👎 별로예요
-              </button>
-            </div>
+            {/* 👍 피드백 버튼 */}
+            <FeedbackButtons userId={card.user_id} cardId={card.id} />
+
+            {card.action_url && (
+              <a href={card.action_url}>
+                <button className="mt-4 bg-[#0066FF] text-white px-4 py-2 rounded-xl text-sm hover:bg-blue-600">
+                  바로가기
+                </button>
+              </a>
+            )}
           </div>
         ))}
       </div>
     </div>
   );
 }
+
